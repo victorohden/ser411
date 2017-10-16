@@ -1,7 +1,9 @@
+# encoding: utf-8
 import sys
+
 # Carrega a Biblioteca GDAL/OGR
 try:
-    from osgeo import ogr
+    from osgeo import ogr, gdal, osr
 except:
     sys.exit("ERRO: Biblioteca GDAL/OGR não encontrada!")
 
@@ -19,9 +21,7 @@ def Geo2Grid (location, dimensions, resolution, extent):
         """
     x = location.GetX()
     y = location.GetY()
-
     col = int((x - extent['xmin'])/resolution['x'])
-
     row = int (dimensions['rows']-(y - extent['ymin'])/resolution['y'])
 
     return col, row

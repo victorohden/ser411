@@ -5,7 +5,7 @@ import sys
 import os
 # Carrega a biblioteca NumPy para criação de matrizes
 import numpy as np
-
+import time
 try:
     from osgeo import gdal, ogr, osr
 except:
@@ -18,7 +18,7 @@ ogr.UseExceptions()
 osr.UseExceptions()
 
 # Definição de constantes globais do programa
-# vector_file = "/home/labgeo4/Dados/Queimadas/focos/focos-2016.shp"
+# vector_file = "/home/labgeo4/Dados/Queimadas/focos/focos-2016.shp" #usado no lab
 vector_file = r"F:\Materias\python\2016\focos\focos-2016.shp"
 vector_file_base_name = os.path.basename(vector_file)
 layer_name = os.path.splitext(vector_file_base_name)[0]
@@ -42,26 +42,25 @@ if layer_focos is None:
 
 sensor = {"TERRA_M-M", "AQUA_M-M", "TERRA_M-T", "AQUA_M-T"}
 mes = {1,2,3,4,5,6,7,8,9,10,11,12,13}
-#mes = {"01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"}
 for x in sensor:  # cada um dos sensores
     for y in mes:  # cada um dos meses
-        if mes == 9:
+        start_time = time.time()#conta o tempo de processamento a partir daqui
+        print ("")#linha em branco
+        if y == 9:
             condicao = "satelite = '%s' and timestamp > '2016/0%s' and timestamp < '2016/%s'" % (x, y, y +1)
-        elif mes > 9:
+        elif y > 9:
             condicao = "satelite = '%s' and timestamp > '2016/%s' and timestamp < '2016/%s'" % (x, y, y +1)
         else:
             condicao = "satelite = '%s' and timestamp > '2016/0%s' and timestamp < '2016/0%s'" % (x, y, y + 1)
-        print (condicao)
-        layer_focos.SetAttributeFilter(condicao)
+        print (condicao) #apenas para controle da busca
+        layer_focos.SetAttributeFilter(condicao) #função de consulta do GDAL
         num_focos = layer_focos.GetFeatureCount()  # contagem do numero de focos
-        print("Satélite: {0}; Mês: {1}; Número de focos:{2}".format(x, y, num_focos))
-
+        print("Satélite: {0}; Mês: {1}; Número de focos:{2} ".format(x, y, num_focos))
         # Criando uma matriz numérica
         matriz = np.zeros((grid_dimensions['rows'], grid_dimensions['cols']), np.int16)
-
         # Calculando o número de focos associado a cada celula
-        for foco in layer_focos:
-            location = foco.GetGeometryRef()  # localização
+        for focos in layer_focos:
+            location = focos.GetGeometryRef()  # localização
             col, row = Geo2Grid(location, grid_dimensions, spatial_resolution, spatial_extent)
             matriz[row, col] += 1
 
@@ -69,21 +68,24 @@ for x in sensor:  # cada um dos sensores
         driver = gdal.GetDriverByName(file_format)
         if driver is None:
             sys.exit("Erro: não foi possivel identificar o driver '{0}'.".format(file_format))
-        output_file_name = outup_file_path + x + "_mes" + str(y) + "_focos" + ".tiff"
+        output_file_name = outup_file_path + x + "_mes" + str(y) + "_focos" + ".tif"
         raster = driver.Create(output_file_name, grid_dimensions['cols'], grid_dimensions['rows'], 1, gdal.GDT_UInt16)
 
         if raster is None:
             sys.exit("Erro: não foi possivel criar o arquivo '{0}'.".format(outup_file_name))
         raster.SetGeoTransform(
-            (spatial_extent['xmin'], spatial_resolution['x'], 0, spatial_extent['ymax'], 0, -spatial_resolution['y']))
+            (spatial_extent['xmin'], spatial_resolution['x'], 0, spatial_extent['ymax'], 0, -spatial_resolution['y']))#treansformação de coordenadas
 
         srs_focos = layer_focos.GetSpatialRef()
         raster.SetProjection(srs_focos.ExportToWkt())
-
+        #Acessa o objeto associado a primeira banda do raster e escreve o array NumPy na banda da GDAL:
         band = raster.GetRasterBand(1)
         band.WriteArray(matriz, 0, 0)
-
         band.FlushCache()
-
+        #garante que toda a estrutura do raster foi deslocada
         raster = None
-del raster, band
+        del raster, band
+        #imprimindo satélite, tempo, número de focos e tempo decorrente do inicico do processamento de cada satelite e mes
+        end_time = time.time()#termino do tempo de processamento
+        print("Tempo de processamento para este Satelite/Mes: --- %s seconds ---" % (end_time- start_time))
+print("Processo terminado")
